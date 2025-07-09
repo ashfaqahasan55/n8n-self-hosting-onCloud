@@ -30,27 +30,13 @@ Youtube Video Explanation: https://www.youtube.com/watch?v=Temh_Ddxp24
 Run the following command to start n8n in Docker. Replace your-domain.com with your actual domain name:
 
     ```bash
-    sudo docker run -d --restart unless-stopped -it \
-    --name n8n \
-    -p 5678:5678 \
-    -e N8N_HOST="your-domain.com" \
-    -e WEBHOOK_TUNNEL_URL="https://your-domain.com/" \
-    -e WEBHOOK_URL="https://your-domain.com/" \
-    -v ~/.n8n:/root/.n8n \
-    n8nio/n8n
+    sudo docker run -d --restart unless-stopped -it --name n8n -p 5678:5678 -e N8N_HOST=0.0.0.0 -e N8N_PORT=5678 -e N8N_EDITOR_BASE_URL="your-domain.com" -e WEBHOOK_TUNNEL_URL="your-domain.comk/" -e WEBHOOK_URL="your-domain.com" -e N8N_SECURE_COOKIE=false -e N8N_RUNNERS_ENABLED=true -v ~/.n8n:/root/.n8n n8nio/n8n
     ```
 
 Or if you are using a subdomain, it should look like this:
 
     ```bash
-    sudo docker run -d --restart unless-stopped -it \
-    --name n8n \
-    -p 5678:5678 \
-    -e N8N_HOST="subdomain.your-domain.com" \
-    -e WEBHOOK_TUNNEL_URL="https://subdomain.your-domain.com/" \
-    -e WEBHOOK_URL="https://subdomain.your-domain.com/" \
-    -v ~/.n8n:/root/.n8n \
-    n8nio/n8n
+    sudo docker run -d --restart unless-stopped -it --name n8n -p 5678:5678 -e N8N_HOST=0.0.0.0 -e N8N_PORT=5678 -e N8N_EDITOR_BASE_URL="your-subdomain.com" -e WEBHOOK_TUNNEL_URL="your-subdomain.com/" -e WEBHOOK_URL="your-subdomain.com" -e N8N_SECURE_COOKIE=false -e N8N_RUNNERS_ENABLED=true -v ~/.n8n:/root/.n8n n8nio/n8n
     ```
 
 
@@ -81,21 +67,23 @@ Configure Nginx to reverse proxy the n8n web interface:
 2. **Paste the Following Configuration:**
     ```bash
     server {
-        listen 80;
-        server_name your-domain.com; // subdomain.your-domain.com if you have a subdomain
+    listen 80;
+    server_name our-domain.com;
 
-        location / {
-            proxy_pass http://localhost:5678;
-            proxy_http_version 1.1;
-            chunked_transfer_encoding off;
-            proxy_buffering off;
-            proxy_cache off;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_read_timeout  3600s;   # allow up to 1 hour for long-running n8n workflows
-            proxy_send_timeout 3600s;   # allow up to 1 hour for large incoming payloads or slow triggers
-        }
+    location / {
+        proxy_pass http://localhost:5678; # Or http://127.0.0.1:5678
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Essential for WebSockets
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 86400s; # Long timeout for WebSockets
     }
+}
     ```
     Replace your-domain.com with your actual domain.
 
@@ -115,6 +103,8 @@ Configure Nginx to reverse proxy the n8n web interface:
     ```bash
     sudo rm /etc/nginx/sites-enabled/default
     sudo ufw allow 80/tcp
+    sudo ufw allow 5678/tcp
+    sudo ufw enable
     ```
 
 ## Step 5: Setting up SSL with Certbot
